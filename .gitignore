@@ -1,0 +1,8 @@
+# Ignore Snakemake specific files
+.snakemake/
+data/
+results/
+
+
+.nox/
+__pycache__/

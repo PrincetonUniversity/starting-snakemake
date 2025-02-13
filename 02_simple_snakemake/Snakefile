@@ -1,0 +1,22 @@
+# Hardcode URLs to analyze
+URLS = [
+    "https://snakemake.readthedocs.io/en/stable/",
+    "https://www.princeton.edu/"
+]
+
+rule all:
+    input:
+        expand("results/{url}.png", 
+               url=[url.replace('https://', '').replace('/', '_').strip('_') 
+                    for url in URLS])
+
+rule analyze_url:
+    output:
+        "results/{url}.png"
+    params:
+        url_base = lambda wildcards: [u for u in URLS 
+                               if wildcards.url == u.replace('https://', '')
+                                                  .replace('/', '_')
+                                                  .strip('_')][0]
+    shell:
+        "python scripts/word_frequencies.py {params.url_base} {output}"

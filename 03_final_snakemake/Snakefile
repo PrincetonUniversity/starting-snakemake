@@ -1,0 +1,60 @@
+import os
+import hashlib
+from urllib.parse import urlparse
+# Helper function to get safe filename from URL
+def get_safe_name(url):
+    return url.replace('https://', '').replace('/', '_').strip('_')
+
+URLS = [
+    "https://snakemake.readthedocs.io/en/stable/",
+    "https://www.princeton.edu/"
+]
+    
+# Generate list of safe filenames
+URL_NAMES = [get_safe_name(url) for url in URLS]
+
+# Rules
+rule all:
+    input:
+        "results/combined_frequencies.png",
+        expand("results/plots/{url_name}.png", url_name=URL_NAMES)
+
+rule download_pages:
+    output:
+        "data/{url_name}.html"
+    params:
+        url=lambda wildcards: [url for url in URLS if get_safe_name(url) == wildcards.url_name][0]
+    shell:
+        "curl -L '{params.url}' -o {output}"
+
+rule extract_text:
+    input:
+        "data/{url_name}.html"
+    output:
+        "results/text/{url_name}.txt"
+    shell:
+        "python scripts/extract_text.py {input} {output}"
+
+rule count_words:
+    input:
+        "results/text/{url_name}.txt"
+    output:
+        "results/counts/{url_name}.json"
+    shell:
+        "python scripts/count_words.py {input} {output}"
+
+rule plot_frequencies:
+    input:
+        counts="results/counts/{url_name}.json"
+    output:
+        "results/plots/{url_name}.png"
+    shell:
+        "python scripts/plot_summary.py {input.counts} {output}"
+
+rule combine_results:
+    input:
+        counts=expand("results/counts/{url_name}.json", url_name=URL_NAMES)
+    output:
+        "results/combined_frequencies.png"
+    shell:
+        "python scripts/combine_counts.py results/counts {output}"
