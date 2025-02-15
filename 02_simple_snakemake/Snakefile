@@ -1,22 +1,56 @@
-# Hardcode URLs to analyze
-URLS = [
-    "https://snakemake.readthedocs.io/en/stable/",
-    "https://www.princeton.edu/"
-]
-
 rule all:
     input:
-        expand("results/{url}.png", 
-               url=[url.replace('https://', '').replace('/', '_').strip('_') 
-                    for url in URLS])
+        "results/princeton.png",
+        "results/snakemake.png"
 
-rule analyze_url:
+rule analyze_princeton:
     output:
-        "results/{url}.png"
-    params:
-        url_base = lambda wildcards: [u for u in URLS 
-                               if wildcards.url == u.replace('https://', '')
-                                                  .replace('/', '_')
-                                                  .strip('_')][0]
+        html="data/princeton.html",
+        counts="data/princeton_wordcount.csv",
+        plot="results/princeton.png"
     shell:
-        "python scripts/word_frequencies.py {params.url_base} {output}"
+        """
+        # Download page
+        curl -o {output.html} https://www.princeton.edu
+
+        # Process text and count words
+        cat {output.html} 2>/dev/null | \
+        sed 's/<[^>]*>//g' | \
+        tr '[:upper:]' '[:lower:]' | \
+        tr -cs '[:alpha:]' '\n' | \
+        grep -v "^$" | \
+        sort | \
+        uniq -c | \
+        sort -nr | \
+        sed 's/^ *//g' | \
+        awk '{{print $2 "," $1}}' > {output.counts}
+
+        # Create plot
+        python scripts/plot_frequencies.py {output.counts} {output.plot}
+        """
+
+rule analyze_snakemake:
+    output:
+        html="data/snakemake.html",
+        counts="data/snakemake_wordcount.csv",
+        plot="results/snakemake.png"
+    shell:
+        """
+        # Download page
+        curl -o {output.html} https://snakemake.readthedocs.io/en/stable/
+
+        # Process text and count words
+        cat {output.html} 2>/dev/null | \
+        sed 's/<[^>]*>//g' | \
+        tr '[:upper:]' '[:lower:]' | \
+        tr -cs '[:alpha:]' '\n' | \
+        grep -v "^$" | \
+        sort | \
+        uniq -c | \
+        sort -nr | \
+        sed 's/^ *//g' | \
+        awk '{{print $2 "," $1}}' > {output.counts}
+
+        # Create plot
+        python scripts/plot_frequencies.py {output.counts} {output.plot}
+        """

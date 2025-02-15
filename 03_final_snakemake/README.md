@@ -2,23 +2,18 @@
 
 This Snakemake workflow analyzes word frequencies across multiple web pages.
 
-
 ## Overview
 
 The workflow:
-1. Downloads and extracts text from specified URLs
-2. Counts word frequencies in each text
+1. Downloads HTML from specified URLs
+2. Extracts and counts words using bash commands
 3. Creates frequency plots for each URL
 4. Combines results into a comparative visualization
 
 ## Usage
 
-> NOTE: You must have Snakemake installed to run this workflow as well as beautifulsoup4 and matplotlib.
-
-
-1. Add URLs to analyze in `links.txt`, one per line
-2. Adjust parameters in `config.yaml` if needed
-3. Run the workflow:
+1. Add URLs to analyze in the Snakefile
+2. Run the workflow:
 ```bash
 snakemake --cores 1
 ```
