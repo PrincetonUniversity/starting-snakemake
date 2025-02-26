@@ -1,56 +1,69 @@
 rule all:
     input:
-        "results/princeton.png",
-        "results/snakemake.png"
+        "results/princeton_bar.png",
 
-rule analyze_princeton:
+
+rule download_princeton:
+    '''Download the raw html from a url.'''
     output:
         html="data/princeton.html",
-        counts="data/princeton_wordcount.csv",
-        plot="results/princeton.png"
+    params:
+        url="https://www.princeton.edu"
     shell:
-        """
-        # Download page
-        curl -o {output.html} https://www.princeton.edu
+        'curl -o {output.html} https://www.princeton.edu'
 
-        # Process text and count words
-        cat {output.html} 2>/dev/null | \
-        sed 's/<[^>]*>//g' | \
-        tr '[:upper:]' '[:lower:]' | \
-        tr -cs '[:alpha:]' '\n' | \
-        grep -v "^$" | \
-        sort | \
-        uniq -c | \
-        sort -nr | \
-        sed 's/^ *//g' | \
-        awk '{{print $2 "," $1}}' > {output.counts}
 
-        # Create plot
-        python scripts/plot_frequencies.py {output.counts} {output.plot}
-        """
-
-rule analyze_snakemake:
+rule tokenize_princeton:
+    '''Given an html, remove html tags and produce one word per line.'''
+    input:
+        html="data/princeton.html",
     output:
-        html="data/snakemake.html",
-        counts="data/snakemake_wordcount.csv",
-        plot="results/snakemake.png"
+        words="data/princeton_words.txt",
+    params:
+        sed_command=(
+                r'/^ *<script/d ; '  # delete all lines with script tags
+                r's/<[^>]*>//g ; '  # remove all remaining tags
+                r's/[^a-zA-Z]\+/\n/g'  # replace any non-alphabetical characters with newlines
+                )
     shell:
-        """
-        # Download page
-        curl -o {output.html} https://snakemake.readthedocs.io/en/stable/
+        "sed '{params.sed_command}' {input.html} |"
+        "grep -v '^$' "  # remove empty lines
+        "> {output.words}"
 
-        # Process text and count words
-        cat {output.html} 2>/dev/null | \
-        sed 's/<[^>]*>//g' | \
-        tr '[:upper:]' '[:lower:]' | \
-        tr -cs '[:alpha:]' '\n' | \
-        grep -v "^$" | \
-        sort | \
-        uniq -c | \
-        sort -nr | \
-        sed 's/^ *//g' | \
-        awk '{{print $2 "," $1}}' > {output.counts}
+rule count_princeton:
+    '''Produce a datatable from the raw list of words.'''
+    input:
+        words="data/princeton_words.txt",
+    output:
+        counts="results/princeton_counts.csv",
+    run:
+        from collections import Counter
+        import pandas as pd
 
-        # Create plot
-        python scripts/plot_frequencies.py {output.counts} {output.plot}
-        """
+        # count the frequency of each word
+        word_counts = Counter(
+                line.strip().lower()
+                for line in open(input['words']))
+
+        # generate dataframe from count dictionary
+        df = pd.DataFrame.from_dict(word_counts, orient='index', columns=['count'])
+        # move the words from index to a separate column
+        df = df.reset_index(names='word')
+        # sort with most frequent words on top
+        df = df.sort_values('count', ascending=False)
+        # save csv
+        df.to_csv(output['counts'])
+
+rule plot_princeton:
+    '''Generate a bar chart of word frequencies from the tabulated counts.'''
+    input:
+        counts="results/princeton_counts.csv",
+    output:
+        chart="results/princeton_bar.png",
+    run:
+        import pandas as pd
+        import matplotlib.pyplot as plt
+        df = pd.read_csv(input['counts'])
+        ax = df[df.word.str.len() > 4].iloc[:20].plot.bar(x='word', y='count')
+        plt.tight_layout()
+        ax.figure.savefig(output['chart'])
