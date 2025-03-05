@@ -2,8 +2,6 @@
 
 This Snakemake workflow analyzes word frequencies across multiple web pages.
 
-The workshop slides are available here:  [Supercharge Your Analyses with Snakemake](https://docs.google.com/presentation/d/11zLDHJCo-uzm7rmrxpHZJNgTg9Zss_rsuWbO1lkb_EI/edit?usp=sharing)
-
 ## Overview
 
 The workflow:
