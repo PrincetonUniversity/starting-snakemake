@@ -1,0 +1,108 @@
+
+urls = {
+        'princeton': "https://www.princeton.edu",
+        'princeton_wiki': "https://en.wikipedia.org/wiki/Princeton_University",
+        }
+
+samples = sorted(urls.keys())
+
+rule all:
+    input:
+        "results/combined_plot.png"
+
+
+rule download:
+    '''Download the raw html from a url.'''
+    output:
+        html="data/{sample}.html",
+    params:
+        url=lambda wildcards: urls[wildcards.sample]
+    shell:
+        'curl -o {output.html} {params.url}'
+
+
+rule tokenize:
+    '''Given an html, remove html tags and produce one word per line.'''
+    input:
+        html="data/{sample}.html",
+    output:
+        words="data/{sample}_words.txt",
+    params:
+        sed_command=(
+                r'/^ *<script/d ; '  # delete all lines with script tags
+                r's/<[^>]*>//g ; '  # remove all remaining tags
+                r's/[^a-zA-Z]\+/\n/g'  # replace any non-alphabetical characters with newlines
+                )
+    shell:
+        "sed '{params.sed_command}' {input.html} |"
+        "grep -v '^$' "  # remove empty lines
+        "> {output.words}"
+
+
+# TODO: update this to use wildcards
+rule count_princeton:
+    '''Produce a datatable from the raw list of words.'''
+    input:
+        words="data/princeton_words.txt",
+    output:
+        counts="results/princeton_counts.csv",
+    run:
+        from collections import Counter
+        import pandas as pd
+
+        # count the frequency of each word
+        word_counts = Counter(
+                line.strip().lower()
+                for line in open(input['words']))
+
+        # generate dataframe from count dictionary
+        df = pd.DataFrame.from_dict(word_counts, orient='index', columns=['count'])
+        # move the words from index to a separate column
+        df = df.reset_index(names='word')
+        # sort with most frequent words on top
+        df = df.sort_values('count', ascending=False)
+        # save csv
+        df.to_csv(output['counts'])
+
+
+rule plot:
+    '''Generate a bar chart of word frequencies from the tabulated counts.'''
+    input:
+        counts="results/{sample}_counts.csv",
+    output:
+        chart="results/{sample}_bar.png",
+    run:
+        import pandas as pd
+        import matplotlib.pyplot as plt
+        df = pd.read_csv(input['counts'])
+        ax = df[df.word.str.len() > 4].iloc[:20].plot.bar(x='word', y='count')
+        plt.tight_layout()
+        ax.figure.savefig(output['chart'])
+
+
+rule combined_plot:
+    input:
+        counts=expand("results/{sample}_counts.csv", sample=samples)
+    output:
+        chart="results/combined_plot.png"
+
+    run:
+        import pandas as pd
+        import matplotlib.pyplot as plt
+        # read in each csv and add top 20 to dataframe
+        data = []
+        for input_file, sample in zip(input['counts'], samples):
+            df = pd.read_csv(input_file)
+            df = df[df.word.str.len() > 4].iloc[:20]
+            df['fraction'] = df['count'] / df['count'].sum()
+            data.append(df.assign(sample=sample))
+
+        # plot top 20 words of each in a combined plot
+        data = pd.concat(data, ignore_index=True)
+        # pivot to wide form
+        data = data.pivot(index='word', columns='sample', values='fraction').fillna(0)
+        # sort by sum of fraction
+        data = data.sort_index(key=data.sum(1).get, ascending=False)
+        ax = data.plot.bar()
+        plt.tight_layout()
+        ax.figure.savefig(output['chart'])

@@ -31,9 +31,29 @@ rule tokenize_princeton:
         "> {output.words}"
 
 
-# TODO: Add in count_princeton rule to create datatable csv
-# Input: words="data/princeton_words.txt"
-# Output: counts="results/princeton_counts.csv"
+rule count_princeton:
+    '''Produce a datatable from the raw list of words.'''
+    input:
+        words="data/princeton_words.txt",
+    output:
+        counts="results/princeton_counts.csv",
+    run:
+        from collections import Counter
+        import pandas as pd
+
+        # count the frequency of each word
+        word_counts = Counter(
+                line.strip().lower()
+                for line in open(input['words']))
+
+        # generate dataframe from count dictionary
+        df = pd.DataFrame.from_dict(word_counts, orient='index', columns=['count'])
+        # move the words from index to a separate column
+        df = df.reset_index(names='word')
+        # sort with most frequent words on top
+        df = df.sort_values('count', ascending=False)
+        # save csv
+        df.to_csv(output['counts'])
 
 
 rule plot_princeton:
