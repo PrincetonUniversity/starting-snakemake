@@ -8,7 +8,8 @@ samples = sorted(urls.keys())
 
 rule all:
     input:
-        "results/combined_plot.png"
+        "results/combined_plot.png",
+        expand("results/{sample}_bar.png", sample=samples)
 
 
 rule download:
