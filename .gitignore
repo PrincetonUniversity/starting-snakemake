@@ -2,6 +2,7 @@
 .snakemake/
 data/
 results/
+.ipynb_checkpoints/
 
 
 .nox/
